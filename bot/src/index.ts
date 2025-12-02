@@ -1,9 +1,11 @@
-import makeWASocket, {
+// bot/src/index.ts
+import {
+  default as makeWASocket,
   DisconnectReason,
   useMultiFileAuthState,
   fetchLatestBaileysVersion,
   WASocket
-} from "@adiwajshing/baileys";
+} from "@whiskeysockets/baileys";
 import P from "pino";
 import axios from "axios";
 import dotenv from "dotenv";
@@ -17,52 +19,61 @@ async function start() {
   const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
   const { version } = await fetchLatestBaileysVersion();
 
-  const logger = P({ level: "silent" }); // avoid TS logger type issues
+  const logger = P({ level: "silent" });
 
   const sock: WASocket = makeWASocket({
     version,
     printQRInTerminal: true,
     auth: state,
     logger
-  });
+  } as any);
 
   sock.ev.on("creds.update", saveCreds);
 
-  sock.ev.on("messages.upsert", async ({ messages }) => {
+  sock.ev.on("messages.upsert", async (event: any) => {
     try {
+      const messages = event.messages || [];
       for (const msg of messages) {
         if (!msg.message) continue;
         if (msg.key && msg.key.fromMe) continue;
-        const from = msg.key.remoteJid!;
+        const from = msg.key.remoteJid;
         const text =
-          msg.message?.conversation ||
-          msg.message?.extendedTextMessage?.text ||
-          (msg.message?.imageMessage?.caption ?? "") ||
+          (msg.message?.conversation) ||
+          (msg.message?.extendedTextMessage?.text) ||
+          (msg.message?.imageMessage?.caption) ||
           "";
-        await handleIncomingMessage(sock, from, text);
+        await handleIncomingMessage(sock as any, from, text);
       }
     } catch (e) {
       console.error("messages.upsert error:", e);
     }
   });
 
-  sock.ev.on("connection.update", async (update) => {
+  sock.ev.on("connection.update", async (update: any) => {
     const { connection, lastDisconnect } = update;
     console.log("connection.update:", connection);
     if (connection === "open") {
       console.log("Bot connected.");
       if (process.env.ALLOW_REMOTE_SESSION === "true" && process.env.APP_BASE_URL) {
         try {
-          await axios.post(`${process.env.APP_BASE_URL}/api/session`, { name: process.env.SESSION_NAME || "default", sessionJson: JSON.stringify(state) }, {
-            headers: { "x-session-key": process.env.SESSION_API_KEY || "" },
-            timeout: 10000
-          });
+          await axios.post(
+            `${process.env.APP_BASE_URL}/api/session`,
+            {
+              name: process.env.SESSION_NAME || "default",
+              sessionJson: JSON.stringify(state)
+            },
+            {
+              headers: { "x-session-key": process.env.SESSION_API_KEY || "" },
+              timeout: 10000
+            }
+          );
           console.log("Session posted to server.");
         } catch (e) {
           console.warn("Session post failed:", e);
         }
       }
     }
+
     if (connection === "close") {
       const code = (lastDisconnect?.error as any)?.output?.statusCode || 0;
       console.warn("Connection closed code:", code);
@@ -71,7 +82,7 @@ async function start() {
         process.exit(0);
       } else {
         console.log("Restarting process to force reconnect.");
-        process.exit(1); // Render will restart
+        process.exit(1);
       }
     }
   });
