@@ -1,0 +1,12 @@
+{
+  "name": "Fashion Theme",
+  "settings": {
+    "color": "pink",
+    "logo": "/assets/fashion.png",
+    "homepage_sections": [
+      "hero",
+      "collections",
+      "footer"
+    ]
+  }
+}

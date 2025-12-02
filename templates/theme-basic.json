@@ -1,1 +1,12 @@
-
+{
+  "name": "Basic Demo Theme",
+  "settings": {
+    "color": "blue",
+    "logo": "/assets/logo.png",
+    "homepage_sections": [
+      "hero",
+      "products",
+      "footer"
+    ]
+  }
+}
