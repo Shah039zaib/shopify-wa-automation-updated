@@ -1,33 +1,26 @@
-
+// server/src/routes/demo.ts
 import express from "express";
 import { pool } from "../services/db";
-
 const router = express.Router();
 
-// Add demo link (admin)
-router.post("/links", async (req, res) => {
-  try {
-    const { category, url } = req.body;
-    const q = "INSERT INTO demo_links (category, url) VALUES ($1,$2) RETURNING *";
-    const r = await pool.query(q, [category, url]);
-    res.json({ ok: true, link: r.rows[0] });
-  } catch (e) {
-    console.error("Add demo error:", e);
-    res.status(500).json({ ok: false, error: String(e) });
-  }
+// ping for quick health checks
+router.get("/ping", async (_req, res) => {
+  return res.json({ pong: true });
 });
 
-// Search demo links (used by AI fallback)
+// simple search endpoint (example)
 router.get("/search", async (req, res) => {
+  const q = (req.query.q || "").toString();
   try {
-    const category = req.query.category as string;
-    if (!category) return res.status(400).json({ ok: false, error: "no category" });
-    const q = "SELECT url FROM demo_links WHERE lower(category)=lower($1) AND safe=true LIMIT 20";
-    const r = await pool.query(q, [category]);
-    res.json({ ok: true, links: r.rows.map((x:any)=>x.url) });
-  } catch (e) {
-    console.error("Search error:", e);
-    res.status(500).json({ ok: false, error: String(e) });
+    // if you have demo_links table return matched, else empty array
+    const r = await pool.query(
+      "SELECT url FROM demo_links WHERE category ILIKE $1 LIMIT 10",
+      [`%${q}%`]
+    ).catch(() => ({ rows: [] }));
+    return res.json({ ok: true, results: r.rows.map((r:any) => r.url) });
+  } catch (e:any) {
+    console.error("demo search error:", e);
+    return res.status(500).json({ ok: false, error: String(e.message || e) });
   }
 });
 
