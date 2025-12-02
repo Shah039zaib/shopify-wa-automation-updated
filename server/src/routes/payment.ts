@@ -21,9 +21,11 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ storage });
 
-// Extend Express Request to include multer file (TypeScript-friendly)
+// Note: avoid referencing Express.Multer types to prevent TS namespace issues.
+// Use any for file to keep TypeScript build clean on Render.
 interface MulterRequest extends express.Request {
-  file?: Express.Multer.File;
+  file?: any;
+  files?: any;
 }
 
 // upload screenshot candidate
@@ -32,11 +34,11 @@ router.post("/upload", upload.single("screenshot"), async (req: MulterRequest, r
     const file = req.file;
     if (!file) return res.status(400).json({ ok: false, error: "No file" });
 
-    // move file to public uploads (simple)
+    // move file to public uploads
     const publicDir = path.join(__dirname, "..", "..", "server_uploads");
     if (!fs.existsSync(publicDir)) fs.mkdirSync(publicDir, { recursive: true });
     const dest = path.join(publicDir, path.basename(file.filename));
-    // file.path is already at uploadDir; move/rename to publicDir
+    // file.path is at uploadDir; move to publicDir
     fs.renameSync(file.path, dest);
     const url = `/server_uploads/${path.basename(dest)}`;
 
@@ -44,7 +46,7 @@ router.post("/upload", upload.single("screenshot"), async (req: MulterRequest, r
     const analysis = await analyzePaymentCandidate(url, dest);
 
     // save candidate
-    const client_id = req.body.client_id || null;
+    const client_id = (req.body && req.body.client_id) || null;
     const q = `INSERT INTO payment_candidates (client_id, screenshot_url, ocr_text, confidence, status) VALUES ($1,$2,$3,$4,$5) RETURNING *`;
     const r = await pool.query(q, [client_id, url, analysis.text || "", analysis.confidence || 0, 'pending']);
     res.json({ ok: true, candidate: r.rows[0], analysis });
@@ -71,6 +73,7 @@ router.post("/:id/confirm", async (req, res) => {
     const id = Number(req.params.id);
     const q = "UPDATE payment_candidates SET status='confirmed' WHERE id=$1 RETURNING *";
     const r = await pool.query(q, [id]);
+    // optional: mark related client as advance_paid
     await pool.query("UPDATE clients SET status='advance_paid' WHERE id=(SELECT client_id FROM payment_candidates WHERE id=$1)", [id]);
     res.json({ ok: true, candidate: r.rows[0] });
   } catch (e) {
