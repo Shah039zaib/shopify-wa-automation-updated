@@ -1,11 +1,13 @@
+// server/tsconfig.json (ensure this exists or merge)
 {
   "compilerOptions": {
-    "target": "ES2020",
+    "target": "es2020",
     "module": "commonjs",
-    "outDir": "dist",
     "rootDir": "src",
+    "outDir": "dist",
     "esModuleInterop": true,
     "strict": false,
     "skipLibCheck": true
-  }
+  },
+  "include": ["src"]
 }
