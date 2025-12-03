@@ -1,121 +1,124 @@
 // bot/src/index.ts
-import express from "express";
-import makeWASocket, {
-  DisconnectReason,
-  useMultiFileAuthState,
-  fetchLatestBaileysVersion,
-  WASocket
-} from "@whiskeysockets/baileys";
+import makeWASocket, { DisconnectReason, useMultiFileAuthState } from "@adiwajshing/baileys";
 import P from "pino";
+import path from "path";
 import axios from "axios";
 import dotenv from "dotenv";
-import path from "path";
-import { handleIncomingMessage } from "./flowService";
+import { handleIncomingMessage } from "./flowService"; // your handler
+import { runLocalOcr } from "./ocrLocal"; // optional
 
 dotenv.config();
+const log = P();
+const SESSION_DIR = process.env.SESSION_DIR || "./bot_sessions";
+const SERVER_HEALTH_URL = (process.env.APP_BASE_URL || process.env.SERVER_URL || "").replace(/\/$/, "") + "/health";
+const HEALTH_PING_INTERVAL_MS = Number(process.env.HEALTH_PING_INTERVAL_MS || 4 * 60 * 1000); // 4 minutes
 
-const PORT = Number(process.env.PORT || process.env.APP_PORT || 10000);
+let lastConnectionState: string | undefined = undefined;
+let lastConnectedAt = 0;
 
 async function startBot() {
-  const sessionDir = path.join(process.cwd(), "bot_sessions");
-  const { state, saveCreds } = await useMultiFileAuthState(sessionDir);
-  const { version } = await fetchLatestBaileysVersion();
+  try {
+    const { state, saveCreds } = await useMultiFileAuthState(SESSION_DIR);
 
-  const logger = P({ level: "silent" });
-  const sock: WASocket = makeWASocket({
-    version,
-    printQRInTerminal: false, // deprecated message suppressed
-    auth: state,
-    logger
-  } as any);
+    const sock = makeWASocket({
+      printQRInTerminal: false, // we handle QR differently in UI
+      auth: state,
+      logger: log
+    });
 
-  sock.ev.on("creds.update", saveCreds);
+    sock.ev.on("creds.update", saveCreds);
 
-  sock.ev.on("messages.upsert", async (event: any) => {
-    try {
-      const messages = event.messages || [];
+    sock.ev.on("messages.upsert", async (m) => {
+      const messages = m.messages;
       for (const msg of messages) {
         if (!msg.message) continue;
-        if (msg.key?.fromMe) continue;
-        const from = msg.key.remoteJid;
-        const text =
-          msg.message?.conversation ||
-          msg.message?.extendedTextMessage?.text ||
-          msg.message?.imageMessage?.caption ||
-          "";
-        await handleIncomingMessage(sock as any, from, text);
+        const from = msg.key.remoteJid!;
+        const text = (msg.message?.conversation) || (msg.message?.extendedTextMessage?.text) || "";
+        try {
+          await handleIncomingMessage(sock, from, text);
+        } catch (e) {
+          console.error("handleIncomingMessage error:", e);
+        }
       }
-    } catch (e) {
-      console.error("messages.upsert error:", e);
-    }
-  });
+    });
 
-  sock.ev.on("connection.update", async (update: any) => {
-    try {
-      const { connection, lastDisconnect, qr } = update;
+    sock.ev.on("connection.update", async (update: any) => {
+      const { connection, lastDisconnect } = update;
       console.log("connection.update:", connection);
-
-      // If QR present, print to logs so you can scan from Render logs
-      if (update.qr) {
-        console.log("QR:", update.qr);
-      }
+      lastConnectionState = connection;
 
       if (connection === "open") {
-        console.log("Bot connected.");
+        lastConnectedAt = Date.now();
+        console.log("WA connected");
+        // push session to server if configured
         if (process.env.ALLOW_REMOTE_SESSION === "true" && process.env.APP_BASE_URL) {
           try {
-            await axios.post(
-              `${process.env.APP_BASE_URL}/api/session`,
-              {
-                name: process.env.SESSION_NAME || "default",
-                sessionJson: JSON.stringify(state)
-              },
-              {
-                headers: { "x-session-key": process.env.SESSION_API_KEY || "" },
-                timeout: 10000
-              }
-            );
-            console.log("Session posted to server.");
+            const authState = state;
+            await axios.post(`${process.env.APP_BASE_URL}/api/session`, { session: authState });
+            console.log("Session posted to server for persistence.");
           } catch (e) {
-            console.warn("Session post failed:", e);
+            console.warn("Could not post session to server:", e);
           }
         }
-      }
-
-      if (connection === "close") {
-        const code = (lastDisconnect?.error as any)?.output?.statusCode || 0;
-        console.warn("Connection closed code:", code);
-        if (code === DisconnectReason.loggedOut) {
-          console.error("Logged out. Remove local session files and re-scan QR.");
-          process.exit(0);
+      } else if (connection === "close") {
+        const code = lastDisconnect?.error?.output?.statusCode;
+        console.log("Connection closed, reason:", code);
+        // if logged out remove session files? For now try reconnect unless logged out
+        if (code !== DisconnectReason.loggedOut) {
+          console.log("Attempting reconnect...");
+          // small delay before restarting
+          setTimeout(() => {
+            startBot().catch(err => {
+              console.error("startBot reconnect failed:", err);
+              // If reconnect repeatedly fails, exit to let Render restart
+              process.exit(1);
+            });
+          }, 3000);
         } else {
-          console.log("Restarting process to force reconnect.");
-          process.exit(1);
+          console.log("Logged out - remove session and re-scan.");
         }
       }
-    } catch (e) {
-      console.error("connection.update handler error:", e);
-    }
-  });
+    });
 
-  return sock;
-}
+    // Periodic keepalive ping to server so Render doesn't sleep the bot process
+    setInterval(async () => {
+      try {
+        if (SERVER_HEALTH_URL) {
+          await fetch(SERVER_HEALTH_URL, { method: "GET", keepalive: true }).catch(() => {});
+          // optional log
+          console.log("Pinged server health.");
+        }
+      } catch (e) {
+        console.warn("Health ping failed", e);
+      }
+    }, HEALTH_PING_INTERVAL_MS);
 
-async function startServerAndBot() {
-  // Start Express health server (so Render sees an open port)
-  const app = express();
-  app.get("/", (_req, res) => res.json({ ok: true, message: "Server running." }));
-  app.get("/health", (_req, res) => res.json({ ok: true, timestamp: Date.now() }));
+    // Watchdog: if not connected for long -> restart process so Render will re-deploy
+    const WATCHDOG_INTERVAL_MS = 60 * 1000; // check every minute
+    setInterval(() => {
+      const now = Date.now();
+      // if lastConnectedAt too old and connection state is not 'open'
+      if (lastConnectionState && lastConnectionState !== "open" && (now - lastConnectedAt) > (1000 * 60 * 10)) {
+        console.error("Watchdog: bot not connected for >10m. Exiting to trigger restart.");
+        process.exit(1);
+      }
+    }, WATCHDOG_INTERVAL_MS);
 
-  app.listen(PORT, () => {
-    console.log(`Health server listening on port ${PORT}`);
-  });
+    // process-level handlers
+    process.on("uncaughtException", (err) => {
+      console.error("Uncaught exception:", err);
+      // allow crash to restart or attempt graceful exit
+      setTimeout(()=>process.exit(1), 1000);
+    });
+    process.on("unhandledRejection", (reason) => {
+      console.error("Unhandled Rejection:", reason);
+      setTimeout(()=>process.exit(1), 1000);
+    });
 
-  // Start bot (no await to keep server running)
-  startBot().catch((e) => {
+  } catch (e) {
     console.error("Bot start error:", e);
     process.exit(1);
-  });
+  }
 }
 
-startServerAndBot();
+startBot();
