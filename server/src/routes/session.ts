@@ -1,9 +1,6 @@
-// server/src/routes/session.ts
 import express from "express";
 import QRCode from "qrcode";
-
 const router = express.Router();
-
 let lastQrText: string | null = null;
 let lastQrAt: number | null = null;
 
@@ -16,9 +13,7 @@ router.post("/qr", (req, res) => {
 });
 
 router.post("/qr/clear", (_req, res) => {
-  lastQrText = null;
-  lastQrAt = null;
-  return res.json({ ok: true });
+  lastQrText = null; lastQrAt = null; return res.json({ ok: true });
 });
 
 router.get("/qr", async (_req, res) => {
@@ -26,9 +21,7 @@ router.get("/qr", async (_req, res) => {
   try {
     const dataUrl = await QRCode.toDataURL(lastQrText);
     return res.json({ ok: true, dataUrl, ts: lastQrAt });
-  } catch (e) {
-    return res.status(500).json({ ok: false, error: "qr_error" });
-  }
+  } catch (e) { return res.status(500).json({ ok: false, error: "qr_error" }); }
 });
 
 export default router;
