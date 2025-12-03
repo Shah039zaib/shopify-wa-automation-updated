@@ -1,4 +1,3 @@
-// admin/src/pages/WhatsAppControl.tsx
 import React, { useEffect, useState } from "react";
 import axios from "axios";
 const API = import.meta.env.VITE_API_BASE || "";
@@ -9,21 +8,17 @@ export default function WhatsAppControl(){
   const [loading, setLoading] = useState(false);
 
   async function fetchQr(){
-    try {
-      setLoading(true);
-      const res = await axios.get(`${API}/api/session/qr`, { timeout: 5000 });
-      if (res.data?.ok) { setQr(res.data.dataUrl); setTs(res.data.ts || null); } else { setQr(null); setTs(null); }
-    } catch { setQr(null); setTs(null); } finally { setLoading(false); }
+    try { setLoading(true); const res = await axios.get(`${API}/api/session/qr`, { timeout: 5000 }); if (res.data?.ok) { setQr(res.data.dataUrl); setTs(res.data.ts || null); } else { setQr(null); setTs(null); } } catch { setQr(null); setTs(null); } finally { setLoading(false); }
   }
 
-  useEffect(()=>{ fetchQr(); const id = setInterval(fetchQr, 5000); return ()=>clearInterval(id); },[]);
+  useEffect(()=>{ fetchQr(); const id = setInterval(fetchQr, 4000); return ()=>clearInterval(id); },[]);
 
   return (
     <div style={{padding:20}}>
       <h3>WhatsApp Session / QR</h3>
       {qr ? (
         <>
-          <p>Scan this QR with WhatsApp (Business):</p>
+          <p>Scan this QR with WhatsApp number:</p>
           <img src={qr} alt="wa-qr" style={{maxWidth:360,border:"1px solid #ddd"}} />
           <div style={{marginTop:12}}>
             <button onClick={fetchQr}>Refresh</button>
