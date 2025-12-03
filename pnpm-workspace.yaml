@@ -1,0 +1,9 @@
+packages:
+  - server
+  - bot
+  - admin
+
+onlyBuiltDependencies:
+  - esbuild
+  - protobufjs
+  - tesseract.js

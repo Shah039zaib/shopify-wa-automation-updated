@@ -1,11 +1,7 @@
 {
   "name": "shopify-wa-automation-updated",
   "private": true,
-  "workspaces": [
-    "server",
-    "bot",
-    "admin"
-  ],
+  
   "scripts": {
     "start:server": "pnpm --filter server start",
     "start:bot": "pnpm --filter bot start",

@@ -1,5 +1,5 @@
 {
-  "name": "swa-bot",
+  "name": "bot",
   "version": "1.0.0",
   "scripts": {
     "build": "tsc -p tsconfig.json",
@@ -12,7 +12,8 @@
     "dotenv": "^16.3.1",
     "tesseract.js": "^4.0.2",
     "ws": "^8.13.0",
-    "@adiwajshing/keyed-db": "^1.0.3"
+    "@adiwajshing/keyed-db": "0.2.4"
+
   },
   "devDependencies": {
     "typescript": "^5.4.2",

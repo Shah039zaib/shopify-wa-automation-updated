@@ -1,6 +1,7 @@
 {
   "name": "shopify-wa-automation",
   "image": "mcr.microsoft.com/devcontainers/javascript-node:20",
+  "postCreateCommand": "corepack enable && pnpm install -w",
   "customizations": {
     "vscode": {
       "extensions": [
@@ -8,6 +9,5 @@
         "esbenp.prettier-vscode"
       ]
     }
-  },
-  "postCreateCommand": "corepack enable && pnpm install -w"
+  }
 }

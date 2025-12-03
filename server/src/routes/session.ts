@@ -1,5 +1,7 @@
 import express from "express";
 import QRCode from "qrcode";
+import fs from "fs";
+
 
 const router = express.Router();
 
