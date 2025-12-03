@@ -1,31 +1,19 @@
-// admin/src/pages/Login.tsx
 import React, { useState } from "react";
 import axios from "axios";
-import { useNavigate } from "react-router-dom";
 const API = import.meta.env.VITE_API_BASE || "";
 
 export default function Login() {
   const [password, setPassword] = useState("");
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
-  const navigate = useNavigate();
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true);
-    setErr("");
+    setLoading(true); setErr("");
     try {
       const res = await axios.post(`${API}/api/admin/auth/login`, { password }, { withCredentials: true });
-      if (res.data?.ok) {
-        navigate("/", { replace: true });
-      } else {
-        setErr(res.data?.error || "Login failed");
-      }
-    } catch (e: any) {
-      setErr(e.response?.data?.error || e.message || "Network error");
-    } finally {
-      setLoading(false);
-    }
+      if (res.data?.ok) { window.location.href = "/"; } else setErr(res.data?.error || "Login failed");
+    } catch (e: any) { setErr(e.response?.data?.error || e.message || "Network error"); } finally { setLoading(false); }
   }
 
   return (
