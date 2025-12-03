@@ -14,4 +14,11 @@ server_uploads/
 /bot/bot_sessions/
 /server/sessions/*
 /bot/bot_sessions/*
-
+*.log
+npm-install.log
+npm-ci.log
+build.log
+dev.log
+start.log
+audit.json
+pnpm-store
