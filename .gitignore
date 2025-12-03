@@ -9,3 +9,9 @@ admin/dist/
 uploads/
 server_uploads/
 *.zip
+
+/server/sessions/
+/bot/bot_sessions/
+/server/sessions/*
+/bot/bot_sessions/*
+
