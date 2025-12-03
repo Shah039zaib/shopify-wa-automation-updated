@@ -2,7 +2,9 @@ import { Pool } from "pg";
 import fs from "fs";
 import path from "path";
 
-const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+const pool = new Pool({
+  connectionString: process.env.DATABASE_URL
+});
 
 export async function initDb() {
   try {
@@ -12,10 +14,11 @@ export async function initDb() {
       await pool.query(sql);
       console.log("Migrations run.");
     } else {
-      console.log("No migrations file.");
+      console.log("No migrations file found:", p);
     }
   } catch (e) {
-    console.warn("initDb error:", e);
+    console.error("DB init error:", e);
+    throw e;
   }
 }
 
