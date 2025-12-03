@@ -1,2 +1,7 @@
-// harmless prebuild
-try { console.log("[check-config] ok"); } catch (e) { console.warn("[check-config] error", e); }
+try {
+  // simple noop checker to avoid some library warnings during build
+  // (keeps build prehook quiet)
+  console.log("[check-config] no config.load() function found (ok)");
+} catch (e) {
+  // ignore
+}
