@@ -1,5 +1,6 @@
 import React, { useState } from "react";
 import axios from "axios";
+
 const API = import.meta.env.VITE_API_BASE || "";
 
 export default function Login() {
@@ -9,11 +10,20 @@ export default function Login() {
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    setLoading(true); setErr("");
+    setLoading(true);
+    setErr("");
     try {
       const res = await axios.post(`${API}/api/admin/auth/login`, { password }, { withCredentials: true });
-      if (res.data?.ok) { window.location.href = "/"; } else setErr(res.data?.error || "Login failed");
-    } catch (e: any) { setErr(e.response?.data?.error || e.message || "Network error"); } finally { setLoading(false); }
+      if (res.data?.ok) {
+        window.location.href = "/";
+      } else {
+        setErr(res.data?.error || "Login failed");
+      }
+    } catch (e: any) {
+      setErr(e.response?.data?.error || e.message || "Network error");
+    } finally {
+      setLoading(false);
+    }
   }
 
   return (
