@@ -1,21 +1,71 @@
-
+// admin/src/pages/AISettings.tsx
 import React, { useEffect, useState } from "react";
-import axios from "axios";
+import { fetchQr, fetchBotStatus } from "../services/bot";
+
 export default function AISettings(){
-  const [key,setKey]=useState("");
-  const [category,setCategory]=useState("");
-  const [links,setLinks]=useState([]);
-  useEffect(()=>{fetchLinks()},[]);
-  async function saveKey(){ alert("Put API key into server env (AI_API_KEY) for security."); }
-  async function addDemo(){ try{ await axios.post((import.meta.env.VITE_API_BASE||"") + "/api/demo/links", { category, url: links[0] || "" }); fetchLinks(); }catch(e){console.error(e);} }
-  async function fetchLinks(){ try{ const r = await axios.get((import.meta.env.VITE_API_BASE||"") + "/api/demo/search?category=all"); console.log(r); }catch(e){console.error(e);} }
-  return <div>
-    <h2>AI Settings</h2>
-    <div className="card">
-      <div><small>Note: For security, AI API key must be set in server environment (AI_API_KEY).</small></div>
-      <div style={{marginTop:8}}><input placeholder="Demo category" value={category} onChange={e=>setCategory(e.target.value)}/></div>
-      <div style={{marginTop:8}}><input placeholder="Demo link (url)" value={links[0]||""} onChange={e=>{const a=[e.target.value]; setLinks(a);}}/></div>
-      <div style={{marginTop:8}}><button onClick={addDemo}>Add Demo Link</button></div>
+  const [qr, setQr] = useState<string | null>(null);
+  const [status, setStatus] = useState<string | null>(null);
+  const [loading, setLoading] = useState(false);
+
+  async function loadStatus() {
+    try {
+      const s = await fetchBotStatus();
+      setStatus(s?.status || JSON.stringify(s));
+    } catch (e) {
+      console.warn("fetchBotStatus failed", e);
+      setStatus("unknown");
+    }
+  }
+
+  async function loadQr() {
+    setLoading(true);
+    try {
+      const r = await fetchQr();
+      if (r?.ok && r?.qr) {
+        setQr(r.qr);
+      } else {
+        setQr(null);
+      }
+    } catch (e) {
+      console.warn("fetchQr failed", e);
+      setQr(null);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  useEffect(()=> {
+    loadStatus();
+    loadQr();
+    // optionally poll QR every 10s when not connected
+    const t = setInterval(()=> loadQr(), 10000);
+    return ()=> clearInterval(t);
+  },[]);
+
+  return (
+    <div style={{padding:20}}>
+      <h2>WhatsApp / Bot</h2>
+      <div style={{marginBottom:12}}>Status: <strong>{status || "loading..."}</strong></div>
+
+      <div style={{marginBottom:12}}>
+        {qr ? (
+          <div>
+            <div style={{marginBottom:8}}>Scan QR from your phone:</div>
+            {/* Use public QR image generator for quick rendering */}
+            <img
+              alt="Bot QR"
+              src={`https://api.qrserver.com/v1/create-qr-code/?data=${encodeURIComponent(qr)}&size=300x300`}
+              style={{border:"1px solid #ddd", borderRadius:6}}
+            />
+            <div style={{marginTop:8, fontSize:12, color:"#666"}}>If QR looks broken, click "Refresh".</div>
+          </div>
+        ) : (
+          <div>
+            <p>{loading ? "Checking for QR…" : "No QR present right now."}</p>
+            <button onClick={loadQr} style={{padding:"8px 12px"}}>Refresh QR</button>
+          </div>
+        )}
+      </div>
     </div>
-  </div>;
+  );
 }
