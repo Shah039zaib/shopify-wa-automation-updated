@@ -1,4 +1,5 @@
-// bot/src/flowService.ts (Baileys v6 safe version)
+// bot/src/flowService.ts
+// Simple, robust incoming message handler for Baileys v5
 
 export async function handleIncomingMessage(sock: any, upsert: any) {
   try {
@@ -6,25 +7,33 @@ export async function handleIncomingMessage(sock: any, upsert: any) {
     const messages = Array.isArray(msgs) ? msgs : [msgs];
 
     for (const msg of messages) {
+      if (!msg || !msg.message) continue;
+      const key = msg.key;
+      const from = key.remoteJid;
       const m = msg.message;
-      if (!m) continue;
 
-      const from = msg.key.remoteJid;
-
-      // text messages
-      if (m.conversation) {
-        await sock.sendMessage(from, { text: "Received: " + m.conversation });
+      // simple text handling
+      const text = m.conversation || m.extendedTextMessage?.text;
+      if (text) {
+        try {
+          await sock.sendMessage(from, { text: "Auto-reply: " + text });
+        } catch (e) {
+          console.warn("sendMessage error:", e);
+        }
+        continue;
       }
 
-      // extended text
-      if (m.extendedTextMessage) {
-        await sock.sendMessage(from, {
-          text: "Received: " + m.extendedTextMessage.text,
-        });
+      // image handling (basic)
+      if (m.imageMessage) {
+        try {
+          await sock.sendMessage(from, { text: "Image received. Use OCR endpoint on server." });
+        } catch (e) {
+          console.warn("sendMessage error for image:", e);
+        }
       }
     }
-  } catch (err) {
-    console.error("FlowService error:", err);
+  } catch (e) {
+    console.error("flowService error:", e);
   }
 }
 
