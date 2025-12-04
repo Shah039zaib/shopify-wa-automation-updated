@@ -127,6 +127,8 @@ async function startBot() {
 }
 
 startBot().catch((e) => {
-  log.error("Bot start error:", e);
+  console.error("🔴 BOT FAILED TO START — FULL ERROR BELOW:");
+  console.error(e?.message || e);
+  console.error("STACK:", e?.stack);
   process.exit(1);
 });
