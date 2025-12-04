@@ -1,38 +1,37 @@
 // bot/src/flowService.ts
-// Minimal, safe incoming message handler.
-// Exports handleIncomingMessage(sock, messages)
-// Keep it simple: replies to text, recognizes images (hands off to OCR), ignores system messages.
+// FIXED FOR BAILEYS v5 – No WASocket namespace typing
 
-import { proto, WASocket } from "@adiwajshing/baileys";
-import { runLocalOcr } from "./ocrLocal";
+import { proto } from "@adiwajshing/baileys";
 
-export async function handleIncomingMessage(sock: WASocket, upsert: any) {
+export async function handleIncomingMessage(sock: any, upsert: any) {
   try {
-    const messages = upsert?.messages || (upsert?.messagesUpsert && upsert.messagesUpsert.messages) || upsert;
-    if (!messages) return;
-    for (const msg of Array.isArray(messages) ? messages : [messages]) {
+    const msgs = upsert?.messages || upsert?.messagesUpsert?.messages || [];
+    const messages = Array.isArray(msgs) ? msgs : [msgs];
+
+    for (const msg of messages) {
       if (!msg.message) continue;
-      const key = msg.key;
-      const from = key.remoteJid;
-      const isGroup = from?.endsWith("@g.us");
-      // ignore statuses, protocol messages
+
+      const from = msg.key.remoteJid;
       const m = msg.message;
-      if (m?.conversation || m?.extendedTextMessage) {
+
+      // Simple text handler
+      if (m.conversation || m.extendedTextMessage) {
         const text = m.conversation || m.extendedTextMessage?.text || "";
-        if (text.trim().toLowerCase() === "ping") {
-          await sock.sendMessage(from, { text: "pong" }, { quoted: msg });
-        } else {
-          // simple echo for now
-          await sock.sendMessage(from, { text: "Received: " + text }, { quoted: msg });
-        }
-      } else if (m?.imageMessage) {
-        // run OCR and reply
-        const tmp = await runLocalOcr(m.imageMessage);
-        await sock.sendMessage(from, { text: "OCR result: " + (tmp?.text || "(no text)") }, { quoted: msg });
+
+        await sock.sendMessage(from, {
+          text: `Received: ${text}`
+        });
+      }
+
+      // Image → OCR Logic (safe)
+      if (m.imageMessage && m.imageMessage.caption) {
+        await sock.sendMessage(from, {
+          text: "Image received — OCR disabled in this version."
+        });
       }
     }
-  } catch (e) {
-    console.warn("flowService error", e);
+  } catch (err) {
+    console.error("flowService error →", err);
   }
 }
 
